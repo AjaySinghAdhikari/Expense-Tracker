@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -106,7 +107,28 @@ def logout():
 
 @app.route("/profile")
 def profile():
-    return "Profile page — coming in Step 4"
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT name, email, created_at FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    stats = conn.execute(
+        "SELECT COUNT(*) AS expense_count, COALESCE(SUM(amount), 0) AS total_spent "
+        "FROM expenses WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+
+    member_since = datetime.strptime(
+        user["created_at"], "%Y-%m-%d %H:%M:%S"
+    ).strftime("%B %Y")
+
+    return render_template(
+        "profile.html", user=user, stats=stats, member_since=member_since
+    )
 
 
 @app.route("/expenses/add")
